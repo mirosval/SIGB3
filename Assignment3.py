@@ -68,15 +68,22 @@ def update(img):
 
     if Undistorting:  # Use previous stored camera matrix and distortion coefficient to undistort the image
         ''' <004> Here Undistoret the image'''
+        image = cv2.undistort(image, cameraMatrix, distCoeffs)
 
     if (ProcessFrame):
 
         ''' <005> Here Find the Chess pattern in the current frame'''
-        patternFound = True
+        retval, currentCorners = cv2.findChessboardCorners(image, (9, 6))
+        patternFound = retval
+
+#         cv2.drawChessboardCorners(image, (9, 6), currentCorners, patternFound)
 
         if patternFound == True:
 
             ''' <006> Here Define the cameraMatrix P=K[R|t] of the current frame'''
+            currentPoints = currentCorners
+            homography, mask = cv2.findHomography(imagePointsFirst, currentPoints)
+
 
 
             if ShowText:
@@ -95,8 +102,9 @@ def update(img):
 
             if ProjectPattern:
                 ''' <007> Here Test the camera matrix of the current view by projecting the pattern points'''
-
-
+                for corner in corners:
+                    corner = corner[0]
+                    cv2.circle(image, (int(corner[0]), int(corner[1])), 3, (0, 0, 255), -1)
 
             if WireFrame:
                 ''' <009> Here Project the box into the current camera image and draw the box edges'''
@@ -288,12 +296,41 @@ DownFace = box[i, j]
 
 ''' <000> Here Call the cameraCalibrate2 from the SIGBTools to calibrate the camera and saving the data'''
 # RecordVideoFromCamera()
-cameraCalibrate2()
+# cameraCalibrate2()
 
 ''' <001> Here Load the numpy data files saved by the cameraCalibrate2'''
+cameraMatrix = np.load("numpyData/camera_matrix.npy")
+distCoeffs = np.load("numpyData/distortionCoefficient.npy")
+rvec = np.load("numpyData/rotatioVectors.npy")
+tvec = np.load("numpyData/translationVectors.npy")
+
+imagePointsFirst = np.load("numpyData/img_points_first.npy")
+objectPoints = np.load("numpyData/obj_points.npy")
+#
+# print(cameraMatrix)
+# print(distCoeffs)
+
 ''' <002> Here Define the camera matrix of the first view image (01.png) recorded by the cameraCalibrate2'''
+
+rotation, jacobian = cv2.Rodrigues(rvec[0])
+translation = tvec[0]
+#
+originalProjection = dot(cameraMatrix, hstack((rotation, translation)))
+
 ''' <003> Here Load the first view image (01.png) and find the chess pattern and store the 4 corners of the pattern needed for homography estimation'''
+image = cv2.imread("01.png")
+retval, originalCorners = cv2.findChessboardCorners(image, (9, 6))
 
+# for point in objectPoints[0]:
+#    point = np.append(point, 1).T
+#    point = dot(originalProjection, point).T
+#    if point[2] != 0:
+#        point[0] = point[0] / point[2]
+#        point[1] = point[1] / point[2]
+#
+#    cv2.circle(image, (int(point[0]), int(point[1])), 3, (0, 0, 255), -1)
+#
+# cv2.imshow("Test", image)
+# cv2.waitKey(0)
 
-
-# run(1)
+run(1)
