@@ -157,6 +157,27 @@ def update(img):
 
             ''' <008> Here Draw the world coordinate system in the image'''
 
+            # Draw Origin
+            origin = [0, 0, 0, 1]
+            origin = cam.project(origin)
+
+            cv2.circle(image, getPoint(origin), 5, (255, 255, 0), -1)
+
+            # Draw X Axis
+            xunit = cam.project([5, 0, 0, 1])
+            cv2.line(image, getPoint(origin), getPoint(xunit), (255, 0, 0))
+            cv2.circle(image, getPoint(xunit), 5, (255, 0, 0), -1)
+
+            # Draw Y Axis
+            yunit = cam.project([0, 5, 0, 1])
+            cv2.line(image, getPoint(origin), getPoint(yunit), (255, 0, 0))
+            cv2.circle(image, getPoint(yunit), 5, (0, 255, 0), -1)
+
+            # Draw Z Axis
+            zunit = cam.project([0, 0, 5, 1])
+            cv2.line(image, getPoint(origin), getPoint(zunit), (255, 0, 0))
+            cv2.circle(image, getPoint(zunit), 5, (0, 0, 255), -1)
+
             if TextureMap:
                 ''' <010> Here Do the texture mapping and draw the texture on the faces of the cube'''
                 ''' <012> Here Remove the hidden faces'''
@@ -166,7 +187,7 @@ def update(img):
 
             if ProjectPattern:
                 ''' <007> Here Test the camera matrix of the current view by projecting the pattern points'''
-                for corner in corners:
+                for corner in currentCorners:
                     corner = corner[0]
                     cv2.circle(image, (int(corner[0]), int(corner[1])), 3, (0, 0, 255), -1)
 
@@ -356,7 +377,8 @@ DownFace = box[i, j]
 '''----------------------------------------'''
 '''----------------------------------------'''
 
-
+def getPoint(p):
+    return (int(p[0]), int(p[1]))
 
 ''' <000> Here Call the cameraCalibrate2 from the SIGBTools to calibrate the camera and saving the data'''
 # RecordVideoFromCamera()
