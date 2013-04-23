@@ -11,6 +11,8 @@ import cv2
 import cv2.cv as cv
 from SIGBTools import *
 
+from cubePoints import *
+
 
 def DrawLines(img, points):
     for i in range(1, 17):
@@ -81,10 +83,72 @@ def update(img):
         if patternFound == True:
 
             ''' <006> Here Define the cameraMatrix P=K[R|t] of the current frame'''
-            currentPoints = currentCorners
-            homography, mask = cv2.findHomography(imagePointsFirst, currentPoints)
 
+            if debug:
+                pattern_size = (9, 6)
+                pattern_points = np.zeros((np.prod(pattern_size), 3), np.float32)
+                pattern_points[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
+                pattern_points *= chessSquare_size
+                obj_points = [pattern_points]
+                obj_points.append(pattern_points)
+                obj_points = np.array(obj_points, np.float64).T
+                obj_points = obj_points[:, :, 0].T
 
+    #             found, rvecs_new, tvecs_new = GetObjectPos(obj_points, imagePointsFirst, cameraMatrix, distCoeffs)
+                found, rvecs_new, tvecs_new = GetObjectPos(obj_points, currentCorners, cameraMatrix, distCoeffs)
+
+                rot, jacobian = cv2.Rodrigues(rvecs_new)
+
+                rotationTranslationMatrix = np.hstack((rot, tvecs_new))
+
+                cam = Camera(dot(cameraMatrix, rotationTranslationMatrix))
+
+                cube = cube_points((6, 4, -1), 2)
+
+            else:
+                idx = np.array([1, 7, 37, 43])
+                firstPoints = []
+                currentPoints = []
+
+                for i in idx:
+                    fp = imagePointsFirst[i]
+                    cp = currentCorners[i][0]
+
+                    firstPoints.append(fp)
+                    currentPoints.append(cp)
+
+                firstPoints = np.array(firstPoints)
+                currentPoints = np.array(currentPoints)
+
+                homography = estimateHomography(firstPoints, currentPoints)
+
+                cam1 = Camera(hstack((cameraMatrix, dot(cameraMatrix, np.array([[0], [0], [-1]])))))
+                cam1.factor()
+
+                cam2 = Camera(dot(homography, cam1.P))
+
+                calibrationInverse = np.linalg.inv(cameraMatrix)
+                rot = dot(calibrationInverse, cam2.P[:, :3])
+
+                r1, r2, t = tuple(hsplit(rot, 3))
+                r3 = cross(r1.T, r2.T).T
+
+                rotationTranslationMatrix = np.hstack((r1, r2, r3, t))
+
+                cam2.P = dot(cameraMatrix, rotationTranslationMatrix)
+                cam2.factor()
+
+                cube = cube_points((0, 0, 0), 0.1)
+                cam = cam2
+
+            box = cam.project(toHomogenious(cube))
+
+            for i in range(1, 17):
+                x1 = box[0, i - 1]
+                y1 = box[1, i - 1]
+                x2 = box[0, i]
+                y2 = box[1, i]
+                cv2.line(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
 
             if ShowText:
                 ''' <011> Here show the distance between the camera origin and the world origin in the image'''
