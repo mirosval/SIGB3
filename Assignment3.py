@@ -94,17 +94,10 @@ def update(img):
                 obj_points = np.array(obj_points, np.float64).T
                 obj_points = obj_points[:, :, 0].T
 
-    #             found, rvecs_new, tvecs_new = GetObjectPos(obj_points, imagePointsFirst, cameraMatrix, distCoeffs)
                 found, rvecs_new, tvecs_new = GetObjectPos(obj_points, currentCorners, cameraMatrix, distCoeffs)
-
                 rot, jacobian = cv2.Rodrigues(rvecs_new)
-
                 rotationTranslationMatrix = np.hstack((rot, tvecs_new))
-
                 cam = Camera(dot(cameraMatrix, rotationTranslationMatrix))
-
-                cube = cube_points((6, 4, -1), 2)
-
             else:
                 idx = np.array([1, 7, 37, 43])
                 firstPoints = []
@@ -125,30 +118,18 @@ def update(img):
                 cam1 = Camera(hstack((cameraMatrix, dot(cameraMatrix, np.array([[0], [0], [-1]])))))
                 cam1.factor()
 
-                cam2 = Camera(dot(homography, cam1.P))
+                cam = Camera(dot(homography, cam1.P))
 
                 calibrationInverse = np.linalg.inv(cameraMatrix)
-                rot = dot(calibrationInverse, cam2.P[:, :3])
+                rot = dot(calibrationInverse, cam.P[:, :3])
 
                 r1, r2, t = tuple(hsplit(rot, 3))
                 r3 = cross(r1.T, r2.T).T
 
                 rotationTranslationMatrix = np.hstack((r1, r2, r3, t))
 
-                cam2.P = dot(cameraMatrix, rotationTranslationMatrix)
-                cam2.factor()
-
-                cube = cube_points((0, 0, 0), 0.1)
-                cam = cam2
-
-            box = cam.project(toHomogenious(cube))
-
-            for i in range(1, 17):
-                x1 = box[0, i - 1]
-                y1 = box[1, i - 1]
-                x2 = box[0, i]
-                y2 = box[1, i]
-                cv2.line(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                cam.P = dot(cameraMatrix, rotationTranslationMatrix)
+                cam.factor()
 
             if ShowText:
                 ''' <011> Here show the distance between the camera origin and the world origin in the image'''
@@ -157,24 +138,25 @@ def update(img):
 
             ''' <008> Here Draw the world coordinate system in the image'''
 
+            print(cam.P)
+
             # Draw Origin
-            origin = [0, 0, 0, 1]
-            origin = cam.project(origin)
+            origin = cam.project(np.array([0, 0, 0, 1]))
 
             cv2.circle(image, getPoint(origin), 5, (255, 255, 0), -1)
 
             # Draw X Axis
-            xunit = cam.project([5, 0, 0, 1])
+            xunit = cam.project(np.array([5, 0, 0, 1]))
             cv2.line(image, getPoint(origin), getPoint(xunit), (255, 0, 0))
             cv2.circle(image, getPoint(xunit), 5, (255, 0, 0), -1)
 
             # Draw Y Axis
-            yunit = cam.project([0, 5, 0, 1])
+            yunit = cam.project(np.array([0, 5, 0, 1]))
             cv2.line(image, getPoint(origin), getPoint(yunit), (255, 0, 0))
             cv2.circle(image, getPoint(yunit), 5, (0, 255, 0), -1)
 
             # Draw Z Axis
-            zunit = cam.project([0, 0, 5, 1])
+            zunit = cam.project(np.array([0, 0, 5, 1]))
             cv2.line(image, getPoint(origin), getPoint(zunit), (255, 0, 0))
             cv2.circle(image, getPoint(zunit), 5, (0, 0, 255), -1)
 
@@ -193,7 +175,8 @@ def update(img):
 
             if WireFrame:
                 ''' <009> Here Project the box into the current camera image and draw the box edges'''
-
+                box2 = cam.project(toHomogenious(box))
+                image = DrawLines(image, box2)
 
     cv2.imshow('Web cam', image)
     global result
@@ -218,6 +201,7 @@ def printUsage():
     print 't: texture map'
     print 'g: project the pattern using the camera matrix (test)'
     print 's: save frame'
+    print 'w: wire frame'
     print 'x: do something!'
 
 
