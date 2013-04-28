@@ -192,6 +192,28 @@ def update(img):
                     masked = cv2.bitwise_and(mask, image)
                     image = cv2.bitwise_or(masked, texture)
 
+                    # Normals
+                    face = faces[texName]
+                    point1 = np.array(face[:, 0])
+                    point2 = np.array(face[:, 1])
+                    point3 = np.array(face[:, 2])
+                    point4 = np.array(face[:, 3])
+
+                    displacement1 = point1 - point2
+                    displacement2 = point2 - point3
+
+                    normal = cross(displacement2, displacement1)
+                    normal = normal / np.linalg.norm(normal)
+
+                    center = (point1 + point2 + point3 + point4) / 4
+                    normalEnd = center + normal
+
+                    base = cam.project(toHomogenious(np.reshape(center, (3, 1))))
+                    tip = cam.project(toHomogenious(np.reshape(normalEnd, (3, 1))))
+
+                    cv2.line(image, getPoint(base), getPoint(tip), (255, 0, 255))
+                    cv2.circle(image, getPoint(tip), 1, (0, 0, 255), -1)
+
 
                 ''' <012> Here Remove the hidden faces'''
 
