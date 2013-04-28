@@ -134,34 +134,65 @@ def update(img):
             if ShowText:
                 ''' <011> Here show the distance between the camera origin and the world origin in the image'''
 
+                K, R, t = cam.factor()
+                distance = sqrt(pow(t[0], 2) + pow(t[1], 2) + pow(t[2], 2))
+
                 cv2.putText(image, str("frame:" + str(frameNumber)), (20, 10), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))  # Draw the text
+                cv2.putText(image, str("dist:" + str(distance)), (20, 30), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))  # Draw the text
 
             ''' <008> Here Draw the world coordinate system in the image'''
 
-            print(cam.P)
-
             # Draw Origin
-            origin = cam.project(np.array([0, 0, 0, 1]))
+            origin = cam.project(np.array([[0], [0], [0], [1]]))
 
             cv2.circle(image, getPoint(origin), 5, (255, 255, 0), -1)
 
             # Draw X Axis
-            xunit = cam.project(np.array([5, 0, 0, 1]))
+            xunit = cam.project(np.array([[5], [0], [0], [1]]))
             cv2.line(image, getPoint(origin), getPoint(xunit), (255, 0, 0))
             cv2.circle(image, getPoint(xunit), 5, (255, 0, 0), -1)
 
             # Draw Y Axis
-            yunit = cam.project(np.array([0, 5, 0, 1]))
+            yunit = cam.project(np.array([[0], [5], [0], [1]]))
             cv2.line(image, getPoint(origin), getPoint(yunit), (255, 0, 0))
             cv2.circle(image, getPoint(yunit), 5, (0, 255, 0), -1)
 
             # Draw Z Axis
-            zunit = cam.project(np.array([0, 0, 5, 1]))
+            zunit = cam.project(np.array([[0], [0], [5], [1]]))
             cv2.line(image, getPoint(origin), getPoint(zunit), (255, 0, 0))
             cv2.circle(image, getPoint(zunit), 5, (0, 0, 255), -1)
 
             if TextureMap:
                 ''' <010> Here Do the texture mapping and draw the texture on the faces of the cube'''
+
+
+                textureNames = ["Top", "Right", "Left", "Up", "Down"]
+
+                for texName in textureNames:
+                    texture = textures[texName]
+
+                    face = normalizeHomogenious(cam.project(toHomogenious(faces[texName])))
+
+                    m, n, c = texture.shape
+                    texFace = [[0, 0],
+                               [0, n],
+                               [m, n],
+                               [m, 0]]
+                    texFace = np.array(texFace, dtype=float64)
+
+                    face = face[:2, ].T
+
+                    homography, mask = cv2.findHomography(texFace, face)
+                    texture = cv2.warpPerspective(texture, homography, (image.shape[1], image.shape[0]))
+
+                    mask = np.empty((image.shape[0], image.shape[1], 3), dtype=uint8)
+                    mask.fill(255)
+                    cv2.fillPoly(mask, np.array([face], 'int32'), (0, 0, 0))
+
+                    masked = cv2.bitwise_and(mask, image)
+                    image = cv2.bitwise_or(masked, texture)
+
+
                 ''' <012> Here Remove the hidden faces'''
 
                 ''' <013> Here Remove the hidden faces'''
@@ -356,7 +387,15 @@ i = array([ [0, 0, 0, 0], [1, 1, 1, 1] , [2, 2, 2, 2]  ])  # indices for the fir
 j = array([ [1, 2, 7, 6], [1, 2, 7, 6], [1, 2, 7, 6] ])  # indices for the second dim
 DownFace = box[i, j]
 
+textures = dict()
+for tex in ["Top", "Right", "Left", "Down", "Up"]:
+    textures[tex] = cv2.imread("Images/" + tex + ".jpg")
 
+faces = {"Top": TopFace,
+         "Right": RightFace,
+         "Left": LeftFace,
+         "Down": DownFace,
+         "Up": UpFace}
 
 '''----------------------------------------'''
 '''----------------------------------------'''
