@@ -134,8 +134,8 @@ def update(img):
             if ShowText:
                 ''' <011> Here show the distance between the camera origin and the world origin in the image'''
 
-                K, R, t = cam.factor()
-                distance = sqrt(pow(t[0], 2) + pow(t[1], 2) + pow(t[2], 2))
+                camCenter = cam.center()
+                distance = sqrt(pow(camCenter[0], 2) + pow(camCenter[1], 2) + pow(camCenter[2], 2))
 
                 cv2.putText(image, str("frame:" + str(frameNumber)), (20, 10), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))  # Draw the text
                 cv2.putText(image, str("dist:" + str(distance)), (20, 30), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))  # Draw the text
@@ -172,6 +172,7 @@ def update(img):
                     texture = textures[texName]
 
                     face = normalizeHomogenious(cam.project(toHomogenious(faces[texName])))
+                    face = face[:2, ].T
 
                     m, n, c = texture.shape
                     texFace = [[0, 0],
@@ -180,24 +181,15 @@ def update(img):
                                [m, 0]]
                     texFace = np.array(texFace, dtype=float64)
 
-                    face = face[:2, ].T
-
                     homography, mask = cv2.findHomography(texFace, face)
                     texture = cv2.warpPerspective(texture, homography, (image.shape[1], image.shape[0]))
 
-                    mask = np.empty((image.shape[0], image.shape[1], 3), dtype=uint8)
-                    mask.fill(255)
-                    cv2.fillPoly(mask, np.array([face], 'int32'), (0, 0, 0))
-
-                    masked = cv2.bitwise_and(mask, image)
-                    image = cv2.bitwise_or(masked, texture)
-
                     # Normals
-                    face = faces[texName]
-                    point1 = np.array(face[:, 0])
-                    point2 = np.array(face[:, 1])
-                    point3 = np.array(face[:, 2])
-                    point4 = np.array(face[:, 3])
+                    face2 = faces[texName]
+                    point1 = np.array(face2[:, 0])
+                    point2 = np.array(face2[:, 1])
+                    point3 = np.array(face2[:, 2])
+                    point4 = np.array(face2[:, 3])
 
                     displacement1 = point1 - point2
                     displacement2 = point2 - point3
@@ -205,14 +197,39 @@ def update(img):
                     normal = cross(displacement2, displacement1)
                     normal = normal / np.linalg.norm(normal)
 
-                    center = (point1 + point2 + point3 + point4) / 4
-                    normalEnd = center + normal
+                    faceCenter = (point1 + point2 + point3 + point4) / 4
+                    normalEnd = faceCenter + normal
 
-                    base = cam.project(toHomogenious(np.reshape(center, (3, 1))))
+                    base = cam.project(toHomogenious(np.reshape(faceCenter, (3, 1))))
                     tip = cam.project(toHomogenious(np.reshape(normalEnd, (3, 1))))
 
-                    cv2.line(image, getPoint(base), getPoint(tip), (255, 0, 255))
-                    cv2.circle(image, getPoint(tip), 1, (0, 0, 255), -1)
+                    camCenter = cam.center()
+
+                    camCenter = np.reshape(camCenter, (1, 3))
+                    camCenter = np.array(camCenter)[0]
+                    cameraVector = camCenter - faceCenter
+                    cameraVector = cameraVector / np.linalg.norm(cameraVector)
+
+                    angle = arccos(dot(normal, cameraVector))
+
+                    if math.isnan(angle):
+                        if cameraVector == normal:
+                            angle = 0.0
+                        else:
+                            angle = np.pi
+
+                    angle = degrees(angle)
+
+                    if angle > 90.0:
+                        continue
+
+                    # Draw texture
+                    mask = np.empty((image.shape[0], image.shape[1], 3), dtype=uint8)
+                    mask.fill(255)
+                    cv2.fillPoly(mask, np.array([face], 'int32'), (0, 0, 0))
+
+                    masked = cv2.bitwise_and(mask, image)
+                    image = cv2.bitwise_or(masked, texture)
 
 
                 ''' <012> Here Remove the hidden faces'''
