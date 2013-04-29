@@ -85,6 +85,7 @@ def update(img):
             ''' <006> Here Define the cameraMatrix P=K[R|t] of the current frame'''
 
             if debug:
+                # Method 2 (using solvepnp)
                 pattern_size = (9, 6)
                 pattern_points = np.zeros((np.prod(pattern_size), 3), np.float32)
                 pattern_points[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
@@ -99,6 +100,10 @@ def update(img):
                 rotationTranslationMatrix = np.hstack((rot, tvecs_new))
                 cam = Camera(dot(cameraMatrix, rotationTranslationMatrix))
             else:
+                # Method 1 (using 2 camera approach)
+                # this one is much worse, probably because it computes the homography between two
+                # frames, both of which can have distortions (relative to each other, and absolute)
+                # Method 2 estimates camera position just from the calibration pattern in the processed image
                 idx = np.array([1, 7, 37, 43])
                 firstPoints = []
                 currentPoints = []
@@ -113,11 +118,13 @@ def update(img):
                 firstPoints = np.array(firstPoints)
                 currentPoints = np.array(currentPoints)
 
+                # between corners in the first captured reference image and the currently captured image
                 homography = estimateHomography(firstPoints, currentPoints)
 
                 cam1 = Camera(hstack((cameraMatrix, dot(cameraMatrix, np.array([[0], [0], [-1]])))))
                 cam1.factor()
 
+                # Cam 2
                 cam = Camera(dot(homography, cam1.P))
 
                 calibrationInverse = np.linalg.inv(cameraMatrix)
@@ -144,7 +151,6 @@ def update(img):
 
             # Draw Origin
             origin = cam.project(np.array([[0], [0], [0], [1]]))
-
             cv2.circle(image, getPoint(origin), 5, (255, 255, 0), -1)
 
             # Draw X Axis
@@ -164,16 +170,19 @@ def update(img):
 
             if TextureMap:
                 ''' <010> Here Do the texture mapping and draw the texture on the faces of the cube'''
-
-
+                # List all the textures that we want to apply
                 textureNames = ["Top", "Right", "Left", "Up", "Down"]
 
                 for texName in textureNames:
+                    # textures variable contains all the loaded textures indexed by their name
                     texture = textures[texName]
 
+                    # faces variable contains all the faces indexed by their name
+                    # project the face into the current image
                     face = normalizeHomogenious(cam.project(toHomogenious(faces[texName])))
                     face = face[:2, ].T
 
+                    # give the texture some coordinates so it can be transformed too
                     m, n, c = texture.shape
                     texFace = [[0, 0],
                                [0, n],
@@ -181,37 +190,48 @@ def update(img):
                                [m, 0]]
                     texFace = np.array(texFace, dtype=float64)
 
+                    # transform and render the texture
                     homography, mask = cv2.findHomography(texFace, face)
                     texture = cv2.warpPerspective(texture, homography, (image.shape[1], image.shape[0]))
 
+                    ''' <012> Here Remove the hidden faces'''
                     # Normals
+                    # gather the points belonging to the currently evaluated face
                     face2 = faces[texName]
                     point1 = np.array(face2[:, 0])
                     point2 = np.array(face2[:, 1])
                     point3 = np.array(face2[:, 2])
                     point4 = np.array(face2[:, 3])
 
+                    # calculate displacement vectors between the point pairs
                     displacement1 = point1 - point2
                     displacement2 = point2 - point3
 
+                    # calculate normal from displacement vectors as a unitary vector
                     normal = cross(displacement2, displacement1)
                     normal = normal / np.linalg.norm(normal)
 
+                    # calculate points for face center and normal end (used to draw the normals)
                     faceCenter = (point1 + point2 + point3 + point4) / 4
                     normalEnd = faceCenter + normal
 
+                    # project the normal points
                     base = cam.project(toHomogenious(np.reshape(faceCenter, (3, 1))))
                     tip = cam.project(toHomogenious(np.reshape(normalEnd, (3, 1))))
 
+                    # get camera center
                     camCenter = cam.center()
-
                     camCenter = np.reshape(camCenter, (1, 3))
                     camCenter = np.array(camCenter)[0]
+
+                    # calculate unitary vector of the camera (look at)
                     cameraVector = camCenter - faceCenter
                     cameraVector = cameraVector / np.linalg.norm(cameraVector)
 
+                    # the angle between the face normal and the camera vector
                     angle = arccos(dot(normal, cameraVector))
 
+                    # take care of some edge cases
                     if math.isnan(angle):
                         if cameraVector == normal:
                             angle = 0.0
@@ -220,9 +240,13 @@ def update(img):
 
                     angle = degrees(angle)
 
+                    # if the angle is > 90 degrees, it means that the face is not visible from the camera
+                    # i.e facing away from camera, and therefore occluded by other faces, facing towards
+                    # the camera
                     if angle > 90.0:
                         continue
 
+                    ''' <013> Here Remove the hidden faces'''
                     # Draw texture
                     mask = np.empty((image.shape[0], image.shape[1], 3), dtype=uint8)
                     mask.fill(255)
@@ -230,12 +254,6 @@ def update(img):
 
                     masked = cv2.bitwise_and(mask, image)
                     image = cv2.bitwise_or(masked, texture)
-
-
-                ''' <012> Here Remove the hidden faces'''
-
-                ''' <013> Here Remove the hidden faces'''
-
 
             if ProjectPattern:
                 ''' <007> Here Test the camera matrix of the current view by projecting the pattern points'''
