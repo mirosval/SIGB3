@@ -3,3 +3,8 @@
 
 *.pyc
 *.pdf
+
+
+# report
+*.aux
+TSWLatexianTemp*
