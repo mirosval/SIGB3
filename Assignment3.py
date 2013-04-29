@@ -99,6 +99,8 @@ def update(img):
                 rot, jacobian = cv2.Rodrigues(rvecs_new)
                 rotationTranslationMatrix = np.hstack((rot, tvecs_new))
                 cam = Camera(dot(cameraMatrix, rotationTranslationMatrix))
+                cam.factor()
+
             else:
                 # Method 1 (using 2 camera approach)
                 # this one is much worse, probably because it computes the homography between two
@@ -137,6 +139,16 @@ def update(img):
 
                 cam.P = dot(cameraMatrix, rotationTranslationMatrix)
                 cam.factor()
+
+#             cube = cube_points((0, 0, 0), 0.1)
+#             box = cam.project(toHomogenious(cube))
+#
+#             for i in range(1, 17):
+#                 x1 = box[0, i - 1]
+#                 y1 = box[1, i - 1]
+#                 x2 = box[0, i]
+#                 y2 = box[1, i]
+#                 cv2.line(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
 
             if ShowText:
                 ''' <011> Here show the distance between the camera origin and the world origin in the image'''
@@ -417,6 +429,7 @@ frameNumber = 0
 
 chessSquare_size = 2
 
+box = getCubePoints([4, 2.5, 0], 1, chessSquare_size)
 box = getCubePoints([4, 2.5, 0], 1, chessSquare_size)
 
 
