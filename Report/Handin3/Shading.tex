@@ -1,1 +1,24 @@
 \section{Shading}
+After we textured the cube we tried to implement the shading code for it. For developing the shader algorithm we divided the path to three steps:
+\begin{description}
+  \item[step1] First, we calculated the shading values (R, G, and B channel) for each point of the real cube in the world coordinate system by having the information about the camera, light source, and the cube position.
+  \item[step2] Then, we found the corresponding pixel in the image for each point.
+  \item[step3] And finally, we Multiplied the shading value to the pixel intensity for each channel.
+\end{description}
+
+\begin{equation}
+I=T(s,t)[
+\underbrace{
+I_{a}k_{a}(x)
+}_\text{Ambient}
++
+\underbrace{
+I_{l}(x)k_{d}(x)max(n(x).l(x),0)
+}_\text{Diffuse}
++
+\underbrace{
+I_{s}k_{s}(r.v)^\alpha
+  }_\text{Specular}
+]
+	\label{eq:phongReflection}
+\end{equation}
