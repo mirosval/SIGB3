@@ -32,6 +32,8 @@ def getMousePointsForImage(image):
     #Return points
     return clickPoints
 
+def normalizeVecotr(v):
+    return v.T/linalg.norm(v)
 def getHomographyFromMouse(I1,I2,N=4):
     """
     getHomographyFromMouse(I1,I2,N=4)-> homography, mousePoints
@@ -694,6 +696,7 @@ def cameraCalibrate2(n=5,pattern_size=(9,6),square_size=2.0,fileName="Pattern.av
         
         
     ret=True
+    print('Press space key for taking the sample images')
     while ret:
         #Read next frame     
     
@@ -709,7 +712,7 @@ def cameraCalibrate2(n=5,pattern_size=(9,6),square_size=2.0,fileName="Pattern.av
         
             if (ch == 27) or (ch == ord('q')):#  break by ECS key
                 break  
-            if (ch == 32):
+            if (ch == 32):#('Press space key for taking the sample images')
                 
                     
                 if (calibrated==False):
@@ -865,7 +868,7 @@ class Camera:
         return self.K
 
 
-    
+
 
 
 # helper functions    
@@ -894,5 +897,166 @@ def rq(A):
     Q = Q.T
     
     return R[:,::-1],Q[::-1,:]
+
+
+
+def BilinearInterpolation(x1,y1,x2,y2,Q12,Q22,Q21,Q11,i,j):
+
+#    return (1.0/((x2-x1)*(y2-y1)))*(Q11*(x2-i)*(y2-j)+Q21*(i-x1)*(y2-j)+Q12*(x2-i)*(j-y1)+Q22*(i-x1)*(j-y1))
+    return (1.0/((x2-x1)*(y1-y2)))*(Q12*(x2-i)*(y1-j)+Q22*(i-x1)*(y1-j)+Q11*(x2-i)*(j-y2)+Q21*(i-x1)*(j-y2))
+
+def BilinearInterpo(size,i,j,points,Normalize):
+
+
+    x1=0
+    y1=0
+    x2=size
+    y2=size
+
+    Q11=points[0,0]
+    Q21=points[0,1]
+    Q22=points[0,2]
+    Q12=points[0,3]
+    X=BilinearInterpolation(x1,y1,x2,y2,Q12,Q22,Q21,Q11,i,j)
+
+
+    Q11=points[1,0]
+    Q21=points[1,1]
+    Q22=points[1,2]
+    Q12=points[1,3]
+    Y=BilinearInterpolation(x1,y1,x2,y2,Q12,Q22,Q21,Q11,i,j)
+
+    Q11=points[2,0]
+    Q21=points[2,1]
+    Q22=points[2,2]
+    Q12 =points[2,3]
+    Z=BilinearInterpolation(x1,y1,x2,y2,Q12,Q22,Q21,Q11,i,j)
+
+    if (Normalize):
+    #        print "XYZ",X,Y,Z
+        normal = (X,Y,Z)/np.linalg.norm((X,Y,Z))
+        X=normal[0]
+        Y=normal[1]
+        Z=normal[2]
+        #        print "",X,Y,Z
+
+    return X,Y,Z
+
+#---------------------------------------------cube
+
+
+
+
+def getCubePoints(center, size,chessSquare_size):
+
+    """ Creates a list of points for plotting
+    a cube with plot. (the first 5 points are
+    the bottom square, some sides repeated). """
+    points = []
+
+    """
+    1    2
+        5    6
+    3    4
+        7    8 (top)
+
+    """
+
+    #bottom
+    points.append([center[0]-size, center[1]-size, center[2]-2*size])#(0)5
+    points.append([center[0]-size, center[1]+size, center[2]-2*size])#(1)7
+    points.append([center[0]+size, center[1]+size, center[2]-2*size])#(2)8
+    points.append([center[0]+size, center[1]-size, center[2]-2*size])#(3)6
+    points.append([center[0]-size, center[1]-size, center[2]-2*size]) #same as first to close plot
+
+    #top
+    points.append([center[0]-size,center[1]-size,center[2]])#(5)1
+    points.append([center[0]-size,center[1]+size,center[2]])#(6)3
+    points.append([center[0]+size,center[1]+size,center[2]])#(7)4
+    points.append([center[0]+size,center[1]-size,center[2]])#(8)2
+    points.append([center[0]-size,center[1]-size,center[2]]) #same as first to close plot
+
+    #vertical sides
+    points.append([center[0]-size,center[1]-size,center[2]])
+    points.append([center[0]-size,center[1]+size,center[2]])
+    points.append([center[0]-size,center[1]+size,center[2]-2*size])
+    points.append([center[0]+size,center[1]+size,center[2]-2*size])
+    points.append([center[0]+size,center[1]+size,center[2]])
+    points.append([center[0]+size,center[1]-size,center[2]])
+    points.append([center[0]+size,center[1]-size,center[2]-2*size])
+    points=dot(points,chessSquare_size)
+    return array(points).T
+
+def GetFaceNormal(points):
+    import numpy as np
+    #    print points
+    A=np.subtract([points[0,3],points[1,3],points[2,3]],[points[0,0],points[1,0],points[2,0]])
+    B=np.subtract([points[0,1],points[1,1],points[2,1]],[points[0,0],points[1,0],points[2,0]])
+    normal=cross(A,B)
+    normal = normal/np.linalg.norm(normal)
+    #    print "normal: ",normal
+    return normal
+def getNormalsInCubeCorners(TopFace,RightFace,LeftFace,UpFace,DownFace):
+
+    """ Creates a list of points for plotting
+    a cube with plot. (the first 5 points are
+    the bottom square, some sides repeated). """
+
+
+    """
+    1    2
+        5    6
+    3    4
+        7    8 (top)
+
+    """
+    points = []
+
+
+    #bottom
+    points.append((GetFaceNormal(UpFace)+ GetFaceNormal(LeftFace)- GetFaceNormal(TopFace))/3)#(0)1
+    points.append(( GetFaceNormal(UpFace)+ GetFaceNormal(RightFace)- GetFaceNormal(TopFace))/3)#(1)2
+    points.append(( GetFaceNormal(DownFace)+ GetFaceNormal(RightFace)- GetFaceNormal(TopFace))/3)#(2)4
+    points.append(( GetFaceNormal(DownFace)+ GetFaceNormal(LeftFace)- GetFaceNormal(TopFace))/3)#(3)3
+
+    points.append(( GetFaceNormal(UpFace)+ GetFaceNormal(LeftFace)+ GetFaceNormal(TopFace))/3)#(4)5
+    points.append(( GetFaceNormal(UpFace)+ GetFaceNormal(RightFace)+ GetFaceNormal(TopFace))/3)#(5)6
+    points.append(( GetFaceNormal(DownFace)+ GetFaceNormal(RightFace)+ GetFaceNormal(TopFace))/3)#(6)8
+    points.append(( GetFaceNormal(DownFace)+ GetFaceNormal(LeftFace)+ GetFaceNormal(TopFace))/3)#(7)7
+
+
+    return array(points).T
+
+def CalculateFaceCornerNormals(TopFace,RightFace,LeftFace,UpFace,DownFace):
+
+
+    CubeCornerNormals=getNormalsInCubeCorners(TopFace,RightFace,LeftFace,UpFace,DownFace)
+
+
+    i = array([ [0,0,0,0],[1,1,1,1] ,[2,2,2,2]  ])  # indices for the first dim
+    j = array([ [4,5,6,7],[4,5,6,7] ,[4,5,6,7]  ])  # indices for the second dim
+    t = CubeCornerNormals[i,j]
+
+
+    i = array([ [0,0,0,0],[1,1,1,1] ,[2,2,2,2]  ])  # indices for the first dim
+    j = array([ [5,1,2,6],[5,1,2,6] ,[5,1,2,6]  ])  # indices for the second dim
+    r= CubeCornerNormals[i,j]
+
+
+    i = array([ [0,0,0,0],[1,1,1,1] ,[2,2,2,2]  ])  # indices for the first dim
+    j = array([ [0,4,7,3],[0,4,7,3],[0,4,7,3] ])  # indices for the second dim
+    l = CubeCornerNormals[i,j]
+
+
+    i = array([ [0,0,0,0],[1,1,1,1] ,[2,2,2,2]  ])  # indices for the first dim
+    j = array([ [0,1,5,4], [0,1,5,4], [0,1,5,4] ])  # indices for the second dim
+    u = CubeCornerNormals[i,j]
+
+
+    i = array([ [0,0,0,0],[1,1,1,1] ,[2,2,2,2]  ])  # indices for the first dim
+    j = array([ [7,6,2,3], [7,6,2,3], [7,6,2,3] ])  # indices for the second dim
+    d = CubeCornerNormals[i,j]
+
+    return t,r,l,u,d
 
 

@@ -106,7 +106,7 @@ def update(img):
                 # this one is much worse, probably because it computes the homography between two
                 # frames, both of which can have distortions (relative to each other, and absolute)
                 # Method 2 estimates camera position just from the calibration pattern in the processed image
-                idx = np.array([1, 7, 37, 43])
+                idx = np.array([0, 8, -9, -1])
                 firstPoints = []
                 currentPoints = []
 
@@ -123,32 +123,19 @@ def update(img):
                 # between corners in the first captured reference image and the currently captured image
                 homography = estimateHomography(firstPoints, currentPoints)
 
-                cam1 = Camera(hstack((cameraMatrix, dot(cameraMatrix, np.array([[0], [0], [-1]])))))
-                cam1.factor()
-
-                # Cam 2
-                cam = Camera(dot(homography, cam1.P))
+                # Cam
+                cam = Camera(dot(homography, originalProjection))
 
                 calibrationInverse = np.linalg.inv(cameraMatrix)
-                rot = dot(calibrationInverse, cam.P[:, :3])
+                rot = dot(calibrationInverse, cam.P[:, :4])
 
-                r1, r2, t = tuple(hsplit(rot, 3))
+                r1, r2, r3, t = tuple(hsplit(rot, 4))
                 r3 = cross(r1.T, r2.T).T
 
                 rotationTranslationMatrix = np.hstack((r1, r2, r3, t))
 
                 cam.P = dot(cameraMatrix, rotationTranslationMatrix)
                 cam.factor()
-
-#             cube = cube_points((0, 0, 0), 0.1)
-#             box = cam.project(toHomogenious(cube))
-#
-#             for i in range(1, 17):
-#                 x1 = box[0, i - 1]
-#                 y1 = box[1, i - 1]
-#                 x2 = box[0, i]
-#                 y2 = box[1, i]
-#                 cv2.line(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
 
             if ShowText:
                 ''' <011> Here show the distance between the camera origin and the world origin in the image'''
@@ -182,6 +169,14 @@ def update(img):
 
             if TextureMap:
                 ''' <010> Here Do the texture mapping and draw the texture on the faces of the cube'''
+                TopFaceCornerNormals, RightFaceCornerNormals, LeftFaceCornerNormals, UpFaceCornerNormals, DownFaceCornerNormals = CalculateFaceCornerNormals(TopFace, RightFace, LeftFace, UpFace, DownFace)
+
+                cornerNormals = {"Top": TopFaceCornerNormals,
+                                 "Right": RightFaceCornerNormals,
+                                 "Left": LeftFaceCornerNormals,
+                                 "Up": UpFaceCornerNormals,
+                                 "Down": DownFaceCornerNormals}
+
                 # List all the textures that we want to apply
                 textureNames = ["Top", "Right", "Left", "Up", "Down"]
 
@@ -197,9 +192,11 @@ def update(img):
                     # give the texture some coordinates so it can be transformed too
                     m, n, c = texture.shape
                     texFace = [[0, 0],
-                               [0, n],
-                               [m, n],
-                               [m, 0]]
+                               [0, m],
+                               [n, m],
+                               [n, 0]]
+
+
                     texFace = np.array(texFace, dtype=float64)
 
                     # transform and render the texture
@@ -210,6 +207,8 @@ def update(img):
                     # Normals
                     # gather the points belonging to the currently evaluated face
                     face2 = faces[texName]
+                    if texName == "Top":
+                        print(face2)
                     point1 = np.array(face2[:, 0])
                     point2 = np.array(face2[:, 1])
                     point3 = np.array(face2[:, 2])
@@ -230,6 +229,8 @@ def update(img):
                     # project the normal points
                     base = cam.project(toHomogenious(np.reshape(faceCenter, (3, 1))))
                     tip = cam.project(toHomogenious(np.reshape(normalEnd, (3, 1))))
+
+                    cv2.line(image, getPoint(base), getPoint(tip), (255, 255, 0))
 
                     # get camera center
                     camCenter = cam.center()
@@ -266,6 +267,8 @@ def update(img):
 
                     masked = cv2.bitwise_and(mask, image)
                     image = cv2.bitwise_or(masked, texture)
+
+#                     image = ShadeFace(image, face2, cornerNormals[texName], cam)
 
             if ProjectPattern:
                 ''' <007> Here Test the camera matrix of the current view by projecting the pattern points'''
@@ -310,8 +313,8 @@ def run(speed):
     '''MAIN Method to load the image sequence and handle user inputs'''
 
     #--------------------------------video
-    # capture = cv2.VideoCapture("Pattern.avi")
-    #--------------------------------camera
+#     capture = cv2.VideoCapture("Pattern.avi")
+#     camera
     capture = cv2.VideoCapture(0)
 
     image, isSequenceOK = getImageSequence(capture, speed)
@@ -432,6 +435,8 @@ chessSquare_size = 2
 box = getCubePoints([4, 2.5, 0], 1, chessSquare_size)
 box = getCubePoints([4, 2.5, 0], 1, chessSquare_size)
 
+# box = cube_points((0, 0, 0), 0.1)
+
 
 i = array([ [0, 0, 0, 0], [1, 1, 1, 1] , [2, 2, 2, 2]  ])  # indices for the first dim
 j = array([ [0, 3, 2, 1], [0, 3, 2, 1] , [0, 3, 2, 1]  ])  # indices for the second dim
@@ -472,6 +477,55 @@ faces = {"Top": TopFace,
 
 def getPoint(p):
     return (int(p[0]), int(p[1]))
+
+def ShadeFace(image, points, cornerNormals, cam):
+    global shadeRes
+    shadeRes = 10
+
+    videoHeight, videoWidth, vd = np.array(image).shape
+
+    points_projected = cam.project(toHomogenious(points))
+    points_projected1 = np.array([[int(points_projected[0, 0]), int(points_projected[1, 0])],
+                                  [int(points_projected[0, 1]), int(points_projected[1, 1])],
+                                  [int(points_projected[0, 2]), int(points_projected[1, 2])],
+                                  [int(points_projected[0, 3]), int(points_projected[1, 3])]])
+
+    square = np.array([[0, 0], [shadesRes - 1, 0], [shadeRes - 1, shadeRes - 1], [0, shadeRes - 1]])
+
+    homography = estimateHomography(square, points_projected1)
+
+    Mr0, Mg0, Mb0 = CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam)
+
+    Mr = cv2.warpPerspective(Mr0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
+    Mg = cv2.warpPerspective(Mg0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
+    Mb = cv2.warpPerspective(Mb0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
+
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    [r, g, b] = cv2.split(image)
+
+    whiteMask = np.copy(r)
+    whiteMask[:, :] = [0]
+
+    points_projected2 = []
+    points_projected2.append([int(points_projected[0, 0]), int(points_projected[1, 0])])
+    points_projected2.append([int(points_projected[0, 1]), int(points_projected[1, 1])])
+    points_projected2.append([int(points_projected[0, 2]), int(points_projected[1, 2])])
+    points_projected2.append([int(points_projected[0, 3]), int(points_projected[1, 3])])
+
+    cv2.fillConvexPoly(whiteMask, array(points_projected2), (255, 255, 255))
+
+    r[nonzero(whiteMask > 0)] = map(lambda x: max(min(x, 255), 0), r[nonzero(whiteMask > 0)] * Mr[nonzero(whiteMask > 0)])
+    g[nonzero(whiteMask > 0)] = map(lambda x: max(min(x, 255), 0), g[nonzero(whiteMask > 0)] * Mg[nonzero(whiteMask > 0)])
+    b[nonzero(whiteMask > 0)] = map(lambda x: max(min(x, 255), 0), b[nonzero(whiteMask > 0)] * Mb[nonzero(whiteMask > 0)])
+
+    image = cv2.merge((r, g, b))
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+    return image
+
+def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
+    pass
+
 
 ''' <000> Here Call the cameraCalibrate2 from the SIGBTools to calibrate the camera and saving the data'''
 # RecordVideoFromCamera()
