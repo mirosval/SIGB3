@@ -207,8 +207,6 @@ def update(img):
                     # Normals
                     # gather the points belonging to the currently evaluated face
                     face2 = faces[texName]
-                    if texName == "Top":
-                        print(face2)
                     point1 = np.array(face2[:, 0])
                     point2 = np.array(face2[:, 1])
                     point3 = np.array(face2[:, 2])
@@ -268,7 +266,8 @@ def update(img):
                     masked = cv2.bitwise_and(mask, image)
                     image = cv2.bitwise_or(masked, texture)
 
-#                     image = ShadeFace(image, face2, cornerNormals[texName], cam)
+#                     image = ShadeFace(image, face2, cornerNormals[texName], cam, True if texName == "Top" else False)
+                    image = ShadeFace(image, face2, cornerNormals[texName], cam)
 
             if ProjectPattern:
                 ''' <007> Here Test the camera matrix of the current view by projecting the pattern points'''
@@ -478,7 +477,7 @@ faces = {"Top": TopFace,
 def getPoint(p):
     return (int(p[0]), int(p[1]))
 
-def ShadeFace(image, points, cornerNormals, cam):
+def ShadeFace(image, points, cornerNormals, cam, drawIntermediate=False):
     global shadeRes
     shadeRes = 10
 
@@ -490,7 +489,7 @@ def ShadeFace(image, points, cornerNormals, cam):
                                   [int(points_projected[0, 2]), int(points_projected[1, 2])],
                                   [int(points_projected[0, 3]), int(points_projected[1, 3])]])
 
-    square = np.array([[0, 0], [shadesRes - 1, 0], [shadeRes - 1, shadeRes - 1], [0, shadeRes - 1]])
+    square = np.array([[0, 0], [shadeRes - 1, 0], [shadeRes - 1, shadeRes - 1], [0, shadeRes - 1]])
 
     homography = estimateHomography(square, points_projected1)
 
@@ -499,6 +498,10 @@ def ShadeFace(image, points, cornerNormals, cam):
     Mr = cv2.warpPerspective(Mr0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
     Mg = cv2.warpPerspective(Mg0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
     Mb = cv2.warpPerspective(Mb0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
+
+    if drawIntermediate:
+        img = cv2.merge((Mr0, Mg0, Mb0))
+        cv2.imshow("Face", img)
 
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     [r, g, b] = cv2.split(image)
@@ -524,7 +527,65 @@ def ShadeFace(image, points, cornerNormals, cam):
     return image
 
 def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
-    pass
+    shade = np.zeros((shadeRes, shadeRes, 3))
+
+    # Ambient
+    IA = np.array([5.0, 5.0, 5.0])
+    # Point Light
+    IP = np.array([5.0, 5.0, 5.0])
+
+    # attenuation
+    fatt = 1
+
+    # Material
+    ka = np.array([0.2, 0.2, 0.2])
+    kd = np.array([0.3, 0.3, 0.3])
+    ks = np.array([0.7, 0.7, 0.7])
+
+    alpha = 100
+
+    # Normal
+    point1 = np.array(points[:, 0])
+    point2 = np.array(points[:, 1])
+    point3 = np.array(points[:, 2])
+    point4 = np.array(points[:, 3])
+
+    faceNormal = GetFaceNormal(points)
+
+    faceCenter = (point1 + point2 + point3 + point4) / 4
+
+    camCenter = cam.center()
+    camCenter = np.reshape(camCenter, (1, 3))
+    camCenter = np.array(camCenter)[0]
+
+    lightPos = camCenter
+
+    viewVector = camCenter - faceCenter
+    viewVector = viewVector / np.linalg.norm(viewVector)
+
+    lightIncidenceVector = lightPos - faceCenter
+    lightIncidenceVector = lightIncidenceVector / np.linalg.norm(lightIncidenceVector)
+
+    lightReflectionVector = 2 * dot(lightIncidenceVector, faceNormal) * faceNormal - lightIncidenceVector
+
+    flat = True
+
+    if flat:
+        for y, row in enumerate(shade):
+            for x, value in enumerate(row):
+                light = max(dot(faceNormal, lightIncidenceVector), 0)
+                spec = pow(dot(lightReflectionVector, viewVector), alpha)
+                shade[y][x][0] = IA[0] * ka[0] + IP[0] * kd[0] * light + IP[0] * ks[0] * spec
+                shade[y][x][1] = IA[1] * ka[1] + IP[1] * kd[1] * light + IP[1] * ks[1] * spec
+                shade[y][x][2] = IA[2] * ka[2] + IP[2] * kd[2] * light + IP[2] * ks[2] * spec
+    else:
+        for y, row in enumerate(shade):
+            for x, value in enumerate(row):
+                shade[y][x][0] = IA[0]
+                shade[y][x][1] = IA[1]
+                shade[y][x][2] = IA[2]
+
+    return shade[:, :, 0], shade[:, :, 1], shade[:, :, 2]
 
 
 ''' <000> Here Call the cameraCalibrate2 from the SIGBTools to calibrate the camera and saving the data'''
