@@ -568,7 +568,7 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
 
     lightReflectionVector = 2 * dot(lightIncidenceVector, faceNormal) * faceNormal - lightIncidenceVector
 
-    flat = True
+    flat = False
 
     if flat:
         for y, row in enumerate(shade):
@@ -581,9 +581,15 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
     else:
         for y, row in enumerate(shade):
             for x, value in enumerate(row):
-                shade[y][x][0] = IA[0]
-                shade[y][x][1] = IA[1]
-                shade[y][x][2] = IA[2]
+
+                interpolatedFaceNormal = BilinearInterpo(shadeRes, x, y, cornerNormals, True)
+
+                light = max(dot(interpolatedFaceNormal, lightIncidenceVector), 0)
+                spec = pow(dot(interpolatedFaceNormal, viewVector), alpha)
+
+                shade[y][x][0] = IA[0] * ka[0] + IP[0] * kd[0] * light + IP[0] * ks[0] * spec
+                shade[y][x][1] = IA[1] * ka[1] + IP[1] * kd[1] * light + IP[1] * ks[1] * spec
+                shade[y][x][2] = IA[2] * ka[2] + IP[2] * kd[2] * light + IP[2] * ks[2] * spec
 
     return shade[:, :, 0], shade[:, :, 1], shade[:, :, 2]
 
