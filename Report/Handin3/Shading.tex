@@ -3,7 +3,7 @@ After we textured the cube we tried to implement the shading code for it. For de
 \begin{description}
   \item[step1] First, we calculated the shading values (R, G, and B channel) for each point of the real cube in the world coordinate system by having the information about the camera, light source, and the cube position.
   \item[step2] Then, we found the corresponding pixel in the image for each point.
-  \item[step3] And finally, we Multiplied the shading value to the pixel intensity for each channel.
+  \item[step3] And finally, we multiplied the shading value to the pixel intensity for each channel.
 \end{description}
 
 \begin{equation}
@@ -22,3 +22,7 @@ I_{s}k_{s}(r.v)^\alpha
 ]
 	\label{eq:phongReflection}
 \end{equation}
+
+But before these steps we used a function named ShadeFace that has been given in the assignment to get the information to calculate the shading. This function gets four inputs (one of the faces’ image, corner’s points of the current face, corner’s normal, camera’s coordinate) and calls another function named CalculateShadeMatrix that we implemented to do the steps above.
+
+So first we are going to explain ShadeFace function and then the CalculateShadeMatrix. ShadeFace function project the points it gets in the input to the camera view, convert it to a set of four points and then calculates a homography from the projected points to corners of a 10x10 square. Now it will call CalculateShadeMatrix function that we will describe later. After CalculateShadeMatrix function returned the layouts of each channel to the ShadeFace function, it will calculate the perspective of them with the homography and the size of the face.
