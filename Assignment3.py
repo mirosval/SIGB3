@@ -65,6 +65,7 @@ def getCubePoints(center, size, chessSquare_size):
 
 
 def update(img):
+    global cameraCenter
     image = copy(img)
 
 
@@ -235,6 +236,10 @@ def update(img):
                     camCenter = np.reshape(camCenter, (1, 3))
                     camCenter = np.array(camCenter)[0]
 
+                    # write to global variable, used to change light positions
+                    # using mouse callback
+                    cameraCenter = camCenter
+
                     # calculate unitary vector of the camera (look at)
                     cameraVector = camCenter - faceCenter
                     cameraVector = cameraVector / np.linalg.norm(cameraVector)
@@ -281,6 +286,7 @@ def update(img):
                 image = DrawLines(image, box2)
 
     cv2.imshow('Web cam', image)
+    cv2.setMouseCallback("Web cam", changeLightSource)
     global result
     result = copy(image)
 
@@ -417,6 +423,8 @@ global homographyPoints
 global calibrationPoints
 global calibrationCamera
 global chessSquare_size
+global lightPosition
+global cameraPosition
 
 ProcessFrame = False
 Undistorting = False
@@ -425,6 +433,9 @@ ShowText = True
 TextureMap = True
 ProjectPattern = False
 debug = True
+
+lightPosition = None
+cameraPosition = None
 
 frameNumber = 0
 
@@ -527,6 +538,7 @@ def ShadeFace(image, points, cornerNormals, cam, drawIntermediate=False):
     return image
 
 def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
+    global lightPosition
     shade = np.zeros((shadeRes, shadeRes, 3))
 
     # Ambient
@@ -558,7 +570,11 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
     camCenter = np.reshape(camCenter, (1, 3))
     camCenter = np.array(camCenter)[0]
 
-    lightPos = camCenter
+    # read light position from global (mouse callback) if set
+    if lightPosition == None:
+        lightPos = camCenter
+    else:
+        lightPos = lightPosition
 
     viewVector = camCenter - faceCenter
     viewVector = viewVector / np.linalg.norm(viewVector)
@@ -583,15 +599,34 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
             for x, value in enumerate(row):
 
                 interpolatedFaceNormal = BilinearInterpo(shadeRes, x, y, cornerNormals, True)
+                interpolatedFaceNormal = np.array(interpolatedFaceNormal)
 
                 light = max(dot(interpolatedFaceNormal, lightIncidenceVector), 0)
-                spec = pow(dot(interpolatedFaceNormal, viewVector), alpha)
+#
+                lightReflectionVector = 2 * dot(lightIncidenceVector, interpolatedFaceNormal) * interpolatedFaceNormal - lightIncidenceVector
+                spec = pow(dot(lightReflectionVector, viewVector), alpha)
 
                 shade[y][x][0] = IA[0] * ka[0] + IP[0] * kd[0] * light + IP[0] * ks[0] * spec
                 shade[y][x][1] = IA[1] * ka[1] + IP[1] * kd[1] * light + IP[1] * ks[1] * spec
                 shade[y][x][2] = IA[2] * ka[2] + IP[2] * kd[2] * light + IP[2] * ks[2] * spec
 
     return shade[:, :, 0], shade[:, :, 1], shade[:, :, 2]
+
+
+def changeLightSource(event, x, y, flag, param):
+    if event != 1:
+        return
+
+    global lightPosition, cameraCenter
+
+    cx = 320
+    cy = 240
+
+    x = 100.0 * ((x - cx) / 320.0)
+    y = 100.0 * ((y - cy) / 240.0)
+
+    lightPosition = np.array([x, y, cameraCenter[2]])
+
 
 
 ''' <000> Here Call the cameraCalibrate2 from the SIGBTools to calibrate the camera and saving the data'''
