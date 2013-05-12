@@ -604,7 +604,7 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
                 light = max(dot(interpolatedFaceNormal, lightIncidenceVector), 0)
 #
                 lightReflectionVector = 2 * dot(lightIncidenceVector, interpolatedFaceNormal) * interpolatedFaceNormal - lightIncidenceVector
-                spec = pow(dot(lightReflectionVector, viewVector), alpha)
+                spec = pow(max(0, dot(lightReflectionVector, viewVector)), alpha)
 
                 shade[y][x][0] = IA[0] * ka[0] + IP[0] * kd[0] * light + IP[0] * ks[0] * spec
                 shade[y][x][1] = IA[1] * ka[1] + IP[1] * kd[1] * light + IP[1] * ks[1] * spec
