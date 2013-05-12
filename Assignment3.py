@@ -271,8 +271,8 @@ def update(img):
                     masked = cv2.bitwise_and(mask, image)
                     image = cv2.bitwise_or(masked, texture)
 
-#                     image = ShadeFace(image, face2, cornerNormals[texName], cam, True if texName == "Top" else False)
-                    image = ShadeFace(image, face2, cornerNormals[texName], cam)
+                    if Shade:
+                        image = ShadeFace(image, face2, cornerNormals[texName], cam)
 
             if ProjectPattern:
                 ''' <007> Here Test the camera matrix of the current view by projecting the pattern points'''
@@ -310,6 +310,8 @@ def printUsage():
     print 'g: project the pattern using the camera matrix (test)'
     print 's: save frame'
     print 'w: wire frame'
+    print 'f: flat/phong shading'
+    print 'h: shading'
     print 'x: do something!'
 
 
@@ -405,6 +407,21 @@ def run(speed):
                 debug = True;
             update(OriginalImage)
 
+        if inputKey == ord('f') or inputKey == ord('F'):
+            global FlatShade
+            if FlatShade:
+                FlatShade = False;
+            else:
+                FlatShade = True;
+            update(OriginalImage)
+
+        if inputKey == ord('h') or inputKey == ord('H'):
+            global Shade
+            if Shade:
+                Shade = False;
+            else:
+                Shade = True;
+            update(OriginalImage)
 
         if inputKey == ord('s') or inputKey == ord('S'):
             name = 'Saved Images/Frame_' + str(frameNumber) + '.png'
@@ -432,6 +449,8 @@ WireFrame = False
 ShowText = True
 TextureMap = True
 ProjectPattern = False
+Shade = True
+FlatShade = False
 debug = True
 
 lightPosition = None
@@ -489,60 +508,96 @@ def getPoint(p):
     return (int(p[0]), int(p[1]))
 
 def ShadeFace(image, points, cornerNormals, cam, drawIntermediate=False):
+    '''
+    Add shading to the image
+    
+    Parameters:
+        image [array]: the input image 
+        points [array]: points belonging to the face being shaded
+        cornerNormals [array]: normal vector for each point
+        cam [Camera]: the camera object used to project
+        drawIntermediate [bool]: wether or not to draw intermediate steps, used for debugging
+    
+    Returns:
+        image [array]: output image with shading applied for the curent face
+    '''
     global shadeRes
+
+    # shadeRes is the resolution of the "overlay" texture we add to the
+    # already existing texture to simulate shading
     shadeRes = 10
 
+    # get the dimensions of the input image
     videoHeight, videoWidth, vd = np.array(image).shape
 
+    # project the face into the image
     points_projected = cam.project(toHomogenious(points))
-    points_projected1 = np.array([[int(points_projected[0, 0]), int(points_projected[1, 0])],
-                                  [int(points_projected[0, 1]), int(points_projected[1, 1])],
-                                  [int(points_projected[0, 2]), int(points_projected[1, 2])],
-                                  [int(points_projected[0, 3]), int(points_projected[1, 3])]])
+    points_projected = np.array([[int(points_projected[0, 0]), int(points_projected[1, 0])],
+                                 [int(points_projected[0, 1]), int(points_projected[1, 1])],
+                                 [int(points_projected[0, 2]), int(points_projected[1, 2])],
+                                 [int(points_projected[0, 3]), int(points_projected[1, 3])]])
 
+    # create an empty image that will be used to store lighting information
     square = np.array([[0, 0], [shadeRes - 1, 0], [shadeRes - 1, shadeRes - 1], [0, shadeRes - 1]])
 
-    homography = estimateHomography(square, points_projected1)
+    # calculate homography to project the lighting texture onto the face in the output image
+    homography = estimateHomography(square, points_projected)
 
-    Mr0, Mg0, Mb0 = CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam)
+    # light texture of dimesions shadeRes x shadeRes with calculated changes to the face texture
+    light = CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam)
 
-    Mr = cv2.warpPerspective(Mr0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
-    Mg = cv2.warpPerspective(Mg0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
-    Mb = cv2.warpPerspective(Mb0, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
+    # project light texture onto the final image
+    light = cv2.warpPerspective(light, homography, (videoWidth, videoHeight), flags=cv2.INTER_LINEAR)
+
+    # get individual channels from the light texture
+    Mr, Mg, Mb = cv2.split(light)
 
     if drawIntermediate:
         img = cv2.merge((Mr0, Mg0, Mb0))
         cv2.imshow("Face", img)
 
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    [r, g, b] = cv2.split(image)
+    # image is BGR
+    b, g, r = cv2.split(image)
 
-    whiteMask = np.copy(r)
-    whiteMask[:, :] = [0]
+    # mask for combining light and texture
+    whiteMask = np.zeros_like(r)
+    cv2.fillConvexPoly(whiteMask, points_projected, (255, 255, 255))
 
-    points_projected2 = []
-    points_projected2.append([int(points_projected[0, 0]), int(points_projected[1, 0])])
-    points_projected2.append([int(points_projected[0, 1]), int(points_projected[1, 1])])
-    points_projected2.append([int(points_projected[0, 2]), int(points_projected[1, 2])])
-    points_projected2.append([int(points_projected[0, 3]), int(points_projected[1, 3])])
+    # multiply texture and light under the mask
+    r[nonzero(whiteMask > 0)] = np.clip(r[nonzero(whiteMask > 0)] * Mr[nonzero(whiteMask > 0)], 0, 255)
+    g[nonzero(whiteMask > 0)] = np.clip(g[nonzero(whiteMask > 0)] * Mg[nonzero(whiteMask > 0)], 0, 255)
+    b[nonzero(whiteMask > 0)] = np.clip(b[nonzero(whiteMask > 0)] * Mb[nonzero(whiteMask > 0)], 0, 255)
 
-    cv2.fillConvexPoly(whiteMask, array(points_projected2), (255, 255, 255))
-
-    r[nonzero(whiteMask > 0)] = map(lambda x: max(min(x, 255), 0), r[nonzero(whiteMask > 0)] * Mr[nonzero(whiteMask > 0)])
-    g[nonzero(whiteMask > 0)] = map(lambda x: max(min(x, 255), 0), g[nonzero(whiteMask > 0)] * Mg[nonzero(whiteMask > 0)])
-    b[nonzero(whiteMask > 0)] = map(lambda x: max(min(x, 255), 0), b[nonzero(whiteMask > 0)] * Mb[nonzero(whiteMask > 0)])
-
-    image = cv2.merge((r, g, b))
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    # recombine the image to BGR
+    image = cv2.merge((b, g, r))
 
     return image
 
 def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
+    '''
+    Calculate the actual lighting "texture"
+    
+    Parameters:
+        image [array]: image where the texture will be drawn to
+        shadeRes [int]: resolution of the lighting texture, since shading is
+                        intensive, we want to keep this as small as possible
+        points [array]: corners of the face where the lighting is calculated
+        cornerNormals [array]: normals at those points
+        cam [Camera]: camera used to project the points to the image
+    
+    Returns:
+        (R,G,B)[shadeRes, shadeRes]: lighting "texture" for the face split to RGB components
+    '''
+
+    # we store the light position in this global variable from the mouse callback
     global lightPosition
+
+    # create the empty lighting texture
     shade = np.zeros((shadeRes, shadeRes, 3))
 
-    # Ambient
+    # Ambient Light
     IA = np.array([5.0, 5.0, 5.0])
+
     # Point Light
     IP = np.array([5.0, 5.0, 5.0])
 
@@ -550,10 +605,11 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
     fatt = 1
 
     # Material
-    ka = np.array([0.2, 0.2, 0.2])
-    kd = np.array([0.3, 0.3, 0.3])
-    ks = np.array([0.7, 0.7, 0.7])
+    ka = np.array([0.2, 0.2, 0.2])  # ambient
+    kd = np.array([0.3, 0.3, 0.3])  # diffuse
+    ks = np.array([0.7, 0.7, 0.7])  # specular
 
+    # used for specular
     alpha = 100
 
     # Normal
@@ -566,6 +622,7 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
 
     faceCenter = (point1 + point2 + point3 + point4) / 4
 
+    # camera center
     camCenter = cam.center()
     camCenter = np.reshape(camCenter, (1, 3))
     camCenter = np.array(camCenter)[0]
@@ -576,41 +633,48 @@ def CalculateShadeMatrix(image, shadeRes, points, cornerNormals, cam):
     else:
         lightPos = lightPosition
 
+    # unitary vector from the camera to the face center
     viewVector = camCenter - faceCenter
     viewVector = viewVector / np.linalg.norm(viewVector)
 
+    # unitary vector from the light source to the face center
     lightIncidenceVector = lightPos - faceCenter
     lightIncidenceVector = lightIncidenceVector / np.linalg.norm(lightIncidenceVector)
 
+    # reflection vector from the face (depends on the face rotation and light position)
     lightReflectionVector = 2 * dot(lightIncidenceVector, faceNormal) * faceNormal - lightIncidenceVector
 
-    flat = False
+    # decide if we should draw flat or phong
+    if FlatShade:
+         # light intensity
+        light = max(dot(faceNormal, lightIncidenceVector), 0)
 
-    if flat:
-        for y, row in enumerate(shade):
-            for x, value in enumerate(row):
-                light = max(dot(faceNormal, lightIncidenceVector), 0)
-                spec = pow(dot(lightReflectionVector, viewVector), alpha)
-                shade[y][x][0] = IA[0] * ka[0] + IP[0] * kd[0] * light + IP[0] * ks[0] * spec
-                shade[y][x][1] = IA[1] * ka[1] + IP[1] * kd[1] * light + IP[1] * ks[1] * spec
-                shade[y][x][2] = IA[2] * ka[2] + IP[2] * kd[2] * light + IP[2] * ks[2] * spec
+         # specular intensity
+        spec = pow(dot(lightReflectionVector, viewVector), alpha)
+
+        # calculate the light (its the same all over the shade texture, hence the "flat")
+        shade[:, :, ] = IA * ka + IP * kd * light + IP * ks * spec
     else:
+        # Phong shading, now we need to iterate through all of the points in the shade texture
         for y, row in enumerate(shade):
             for x, value in enumerate(row):
-
+                # interpolated normal for this point on the face, takes into account face corner normals
                 interpolatedFaceNormal = BilinearInterpo(shadeRes, x, y, cornerNormals, True)
                 interpolatedFaceNormal = np.array(interpolatedFaceNormal)
 
+                # light intensity
                 light = max(dot(interpolatedFaceNormal, lightIncidenceVector), 0)
-#
+
+                # specular intensity
                 lightReflectionVector = 2 * dot(lightIncidenceVector, interpolatedFaceNormal) * interpolatedFaceNormal - lightIncidenceVector
                 spec = pow(max(0, dot(lightReflectionVector, viewVector)), alpha)
 
-                shade[y][x][0] = IA[0] * ka[0] + IP[0] * kd[0] * light + IP[0] * ks[0] * spec
-                shade[y][x][1] = IA[1] * ka[1] + IP[1] * kd[1] * light + IP[1] * ks[1] * spec
-                shade[y][x][2] = IA[2] * ka[2] + IP[2] * kd[2] * light + IP[2] * ks[2] * spec
+                # put it all together
+                shade[y][x] = IA * ka + IP * kd * light + IP * ks * spec
 
-    return shade[:, :, 0], shade[:, :, 1], shade[:, :, 2]
+    # return by channel
+#     return shade[:, :, 0], shade[:, :, 1], shade[:, :, 2]
+    return shade
 
 
 def changeLightSource(event, x, y, flag, param):
