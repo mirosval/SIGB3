@@ -1,8 +1,9 @@
-\pagebreak{}
+\pagebreak
+
 \section{Introduction}
 
-This assignment has been divided to two main parts as augmented a cube and shading it. In the first part of the assignment we were tasked to learn more about the mathematics behind the camera calibration and computer graphics. Like the two previous assignment, to obtain our goal we used Python and OpenCV as a toolkit.
+This assignment has been divided to two main parts: drawing a cube and shading it. In the first part the emphasis was more on the mathematics behind the camera calibration, homographies and projections, whereas in the second part we have focused on calculating shading of the textured cube. similarly to the previous assignments, we used Python and OpenCV as a toolkit.
 
-The purpose for the first part of the assignment was to be able to use the camera matrix to map the points from a coordinate system to another in a hierarchy of the coordinate systems (world, camera, object) and for the second part it was to be able to implement the illumination and shading on the cube that are the two basic concepts in computer graphics. 
+In the following text we describe the steps we took to complete the assignments. Each step is building on top of  the previous in a natural progression. We begin by describing how we used camera calibration to establish world coordinates, next we describe the steps necessary to project a wireframe cube into this world, followed by projecting a textured version of the cube, and backface culling to remove the faces not visible from the camera perspective.
 
-In this assignment we covered some uses of camera matrix and augmented reality. Our result for the first part of the assignment was the augmentation on a pattern plane in front of the camera. We mapped a cube with a texture map that can move with the plane movement and seems like it has been attached to the plane. For the second part of our assignment the result was a shaded augmentation to have the cube closer to the reality.
+In the second part of the assignment we enhance the textured cube from the first part by applying the Phong shading algorithm for a single light source
