@@ -233,6 +233,8 @@ A solution we have tried to combat this problem is overlaying a transparent-to-w
 
 False negatives are produced when a pupil should have been detected, but was not. These cases can be caught by our automated testing, because all of the frames being tested should contain a pupil. This is of course very similar to the previous case with k-means, but we have to manage limiting this problem using the iterative lowering of k-means parameter.
 
+One idea, if the detection was speedier, would be to actually compare the detected positions with the previous frame, this could improve the results when the pupil is suddenly detected in the wrong part of the image, but might have a negative impact, when the first detection is wrong, then all the subsequent detections could be wrong as well.
+
 
 \subsection{Conclusion}
 In the beginning we have set out to build an eye tracker. We have constructed an eye tracker by iteratively building up detectors for pupil, iris and glints. We have described this process in the Method section. Next, we have built a test suite to evaluate the results we got from our eye tracker. We have talked about this in the Results chapter, where we also discussed the performance of the algorithm both in terms of speed and accuracy.
