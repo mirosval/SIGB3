@@ -20,7 +20,7 @@ We started by obtaining the homography matrix. We have specified four points in 
 	\label{fig:trace}
 \end{figure}
 
-Using the obtained homography matrix we have been then able to project the video image onto the overview map of ITU which can be seen in the Figure \ref{fig:trace}. Using the trace data provided we have then been able to position the person in the overview map. We have taken the center point of the bottom edge of the rectangle describing the person's legs. This point should always be on the ground and therefore should guarantee the best approximation of the person's actual position (as opposed to the head for example, which would form a triangle between head, legs and a point defined by camera angle further away from the camera on the floor, yielding an inaccuracy of around the person's height at this camera angle).
+Using the obtained homography matrix we have been then able to project the video image onto the overview map of ITU which can be seen in the Figure \ref{fig:trace}. Using the provided trace data we have then been able to position the person in the overview map. We have taken the center point of the bottom edge of the rectangle describing the person's legs. This point should always be on the ground and therefore should guarantee the best approximation of the person's actual position (as opposed to the head for example, which would form a triangle between head, legs and a point defined by camera angle further away from the camera on the floor, yielding an inaccuracy of around the person's height at this camera angle).
 
 \begin{equation}
 	L = H \cdot P
