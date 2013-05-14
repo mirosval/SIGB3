@@ -55,7 +55,7 @@ In this part we tried to overview the ITU logo on the image sequence of ground f
 
 \subsubsection{Moving object}
 
-In the second part of linear texture mapping we tried to experiment with texture mapping on image sequences where the objects move. We have been given some video files where a grid pattern moves in it. The aim is to mapping a texture on the pattern that will move with it. For the start we found the pattern corners with findChessboardCorners function and used it for calculating the homography matrix and overview the logo on the pattern. So for each frame we get a new homography matrix and new texture mapping. Our implementation weakness is that in some frames that it can not detect corners of the pattern it will fail because we used corners location to mapping the logo.
+In the second part of linear texture mapping we tried to experiment with texture mapping on image sequences where the objects move. We have been given some video files where a grid pattern moves in it. The aim is to mapping a texture on the pattern that will move with it. For the start we found the pattern corners with findChessboardCorners function and used it for calculating the homography matrix and overview the logo on the pattern. So for each frame we get a new homography matrix and new texture mapping. Our implementation weakness is that in some frames that it cannot detect corners of the pattern it will fail because we used corners location to mapping the logo.
 
 \begin{figure}[h!]
 	\centering
@@ -85,7 +85,7 @@ This section is divided into two parts, first we will look at how we obtained pr
 
 During the camera calibration phase we aim to obtain intrinsic camera parameters. This is divided into two parts, first there is a camera matrix K (see Equation \ref{eq:cameramatrix}) which describes the intrinsic properties of the camera, and then there are distortion coefficients which we do not represent in the linear camera model, but they affect the image nonetheless. 
 
-The R|t part is the rotation/translation matrix. This are the extrinsic properties of the camera like its rotation and translation in the world.
+The R|t part is the rotation/translation matrix. These are the extrinsic properties of the camera like its rotation and translation in the world.
 
 P is a point in the 3D space that we want to project onto the 2D image obtained by the camera. 
 
@@ -149,7 +149,7 @@ From that we have been able to re-construct the camera that was essentially used
 	\label{eq:solvingforrotation}
 \end{equation}
 
-Now using the projection matrix of the second camera, we can project points in the 3D space onto the final image, so that they appear as if they were in the scene. And since the homogrpahy is calculated from one chessboard to another, the points are anchored the position of the chessboard.
+Now using the projection matrix of the second camera, we can project points in the 3D space onto the final image, so that they appear as if they were in the scene. And since the homography is calculated from one chessboard to another, the points are anchored the position of the chessboard.
 
 \subsection{Conclusion}
 In the beginning we started with the point transfers and texture mapping, by detecting a person movement and overviewing an image in a video with using homography. The challenges we faced in this part were to working with matrixes and points in images and sequences. We tried to implement fast and optimized codes to get the best result and reduce the wrong results and code failure in video frames.
