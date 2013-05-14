@@ -3,9 +3,9 @@
 
 \subsection{Introduction}
 
-This assignment has been divided to two main parts: drawing a cube and shading it. In the first part the emphasis was more on the mathematics behind the camera calibration, homographies and projections, whereas in the second part we have focused on calculating shading of the textured cube. similarly to the previous assignments, we used Python and OpenCV as a toolkit.
+This assignment has been divided to two main parts: drawing a cube and shading it. In the first part the emphasis was more on the mathematics behind the camera calibration, homographies and projections, whereas in the second part we have focused on calculating shading of the textured cube. Similarly to the previous assignments, we used Python and OpenCV as a toolkit.
 
-In the following text we describe the steps we took to complete the assignments. Each step is building on top of  the previous in a natural progression. We begin by describing how we used camera calibration to establish world coordinates, next we describe the steps necessary to project a wireframe cube into this world, followed by projecting a textured version of the cube, and backface culling to remove the faces not visible from the camera perspective.
+In the following text we describe the steps we took to complete the assignments. Each step is building on top of the previous in a natural progression. We begin by describing how we used camera calibration to establish world coordinates, next we describe the steps necessary to project a wireframe cube into this world, followed by projecting a textured version of the cube, and backface culling to remove the faces not visible from the camera perspective.
 
 In the second part of the assignment we enhance the textured cube from the first part by applying the Phong shading algorithm for a single light source
 
@@ -41,7 +41,7 @@ To verify that \textit{P} is correct we projected chess points on the first came
 	\caption{Camera Calibration}
 \end{figure}
  
-In the last step of this part we tried to undistort the image by using the (cv2.undistort) function. (see Figure \ref{subfig:undistort}). Using the chessboard, OpenCV has been able to calculate camera distortion coefficients, that we have stored for later use as well.
+In the last step of this part we tried to undistorted the image by using the (cv2.undistort) function. (see Figure \ref{subfig:undistort}). Using the chessboard, OpenCV has been able to calculate camera distortion coefficients, which we have stored for later use as well.
 
 \subsection{Augmented Cube}
 In this section, we calculated the full camera matrix in each frame and we used that for projecting a 3D cube into that frame. After that we tried to do the texture mapping on the faces of the cube we projected.
@@ -67,7 +67,7 @@ To draw a wireframe model in Figure \ref{fig:wireframe} we simply take a pair of
 
 To texture our wireframe model, we first calculate the homography between the texture (2D image) and a face of the cube as it is projected in the 2D final image. We then use this homography to perspective warp the texture into the final image. See Figure \ref{subfig:texture}. But this is obviously not right, some faces overlap others randomly. We solve this by a technique called back-face culling.
 
-Back-face culling is a technique we have employed to address the problem that appears when we render the whole cube. In the 2D view you can not see all 5 textured faces of the cube at once. It is only possible to see one to three faces at any given time. Therefore some faces we render are redundant. All faces are drawn in the order in which the list containing their names is processed, so it is the same order always. Therefore the faces that are drawn later occlude faces drawn earlier, even though logically they should be behind them. 
+Back-face culling is a technique we have employed to address the problem that appears when we render the whole cube. In the 2D view you cannot see all 5 textured faces of the cube at once. It is only possible to see one to three faces at any given time. Therefore some faces we render are redundant. All faces are drawn in the order in which the list containing their names is processed, so it is the same order always. Therefore the faces that are drawn later occlude faces drawn earlier, even though logically they should be behind them. 
 
 To address this problem, a simple technique has been developed, where we determine the angle between the camera and a face, and based on that we decide whether or not to show the face. First we compute the unitary normal vector of the face. We take three points from the face, since we assume that the face is composed of four coplanar points, it does not matter which three we take, but the order does matter, because with wrong order we will get a normal that faces the other way (inside the cube). We then construct displacement vectors between two point pairs of the three points, and calculate the cross product of these vectors. As the last step we transform the obtained vector to get a unitary vector. 
 
@@ -111,9 +111,9 @@ Shading is a process that is often applied to 3D rendered objects to make them a
 	\label{eq:shading}
 \end{equation}
 
-This equation differs slightly from what has been implemented in our report, because it allows for multiple light sources, whereas we have only implemented one light source. On the other hand both the equation, and our implementation assume the material is uniform, while it could easily be a texture.
+This equation differs slightly from what has been implemented in our report, because it allows for multiple light sources, whereas we have only implemented one light source. On the other hand both the equation and our implementation assume the material is uniform, while it could easily be a texture.
 
-To shade the individual faces in our project, we used a low resolution (10$\times$10) texture that we have multiplied with the texture calculated from before. We have implemented two different approaches to shading, the flat shading model and and Phong shading model. In both models, the underlying equation is the same (Figure \ref{eq:shading}), but there are differences in how it is applied.
+To shade the individual faces in our project, we used a low resolution (10$\times$10) texture that we have multiplied with the texture calculated from before. We have implemented two different approaches to shading, the flat shading model and Phong shading model. In both models, the underlying equation is the same (Figure \ref{eq:shading}), but there are differences in how it is applied.
 
 In the flat shading model, we only need to calculate one diffuse and specular value per face, and apply it to the whole face.
 
